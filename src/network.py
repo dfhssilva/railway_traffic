@@ -1,5 +1,6 @@
 import networkx as nx
 import pandas as pd
+from dateutil.parser import parse
 
 from src.data import load_cleaned_trains, load_stations_metadata
 
@@ -60,23 +61,52 @@ def create_nodes(df):
 
 
 def create_edges(df):
-    """Create the network edges for the cleaned trains DataFrame."""
+    """Create the weighted network edges for the cleaned trains DataFrame."""
 
-    def _extract_edges(row):
-        route = row.split("-")
-        return pd.DataFrame(
-            [
-                [station, route[i + 1]]
-                for i, station in enumerate(route)
-                if i != len(route) - 1
-            ]
-        )
+    def _extract_edge_rows(rows):
+        def _sort_alphabetically(station1, station2):
+            return sorted([station1, station2], key=str.lower)
 
-    # Extract unique edges from routeEmbedding
-    edges = (
-        pd.concat(df["routeEmbedding"].apply(_extract_edges).tolist())
-        .drop_duplicates()
-        .values
+        edges = []
+        for i, j in enumerate(rows):
+            # We want edges to represent DEPARTURE->DEPARTURE (connect different stations and include time spent on station)
+            if j["type"] == "ARRIVAL":
+                continue
+            # In the last DEPARTURE, compute duration to next ARRIVAL and not to next DEPARTURE
+            if i == len(rows) - 2:
+                step = 1
+            else:
+                step = 2
+            # Use actualTime if available to be more precise
+            if (
+                j.get("actualTime") is not None
+                and rows[i + step].get("actualTime") is not None
+            ):
+                duration = parse(rows[i + step]["actualTime"]) - parse(j["actualTime"])
+            else:
+                duration = parse(rows[i + step]["scheduledTime"]) - parse(
+                    j["scheduledTime"]
+                )
+            # Sort stations alphabetically so the direction doesn't interfere with the edgeCode
+            left_station, right_station = _sort_alphabetically(
+                j["stationShortCode"], rows[i + step]["stationShortCode"]
+            )
+            edge = {
+                "edgeCode": f"{left_station}-{right_station}",
+                "avgDuration": int(duration.total_seconds() / 60),
+            }
+            edges.append(edge)
+        return edges
+
+    # Create edge_rows
+    edges = df["timeTableRows"].apply(_extract_edge_rows)
+    # Convert edge_rows to DataFrame
+    edges = pd.DataFrame(edges.explode().reset_index(drop=True).tolist())
+    # Group by edgeCode and get average duration
+    edges = edges.groupby("edgeCode").mean()
+    # Assemble edges in expected format by networkx
+    edges = list(
+        map(lambda x: (*x[0].split("-"), x[1]), edges.to_dict(orient="index").items())
     )
     return edges
 

@@ -44,7 +44,7 @@ def prep_trains_last_30_days(df) -> pd.DataFrame:
         else:
             return parse(rows[-1]["scheduledTime"]) - parse(rows[0]["scheduledTime"])
 
-    def _extract_journey_embedding(rows):
+    def _extract_route_embedding(rows):
         non_consecutive_rows = [
             j["stationShortCode"]
             for i, j in enumerate(rows)
@@ -61,7 +61,7 @@ def prep_trains_last_30_days(df) -> pd.DataFrame:
         .astype(int)
     )
     df["trainDuration"] = df["timeTableRows"].apply(_compute_duration)
-    df["routeEmbedding"] = df["timeTableRows"].apply(_extract_journey_embedding)
+    df["routeEmbedding"] = df["timeTableRows"].apply(_extract_route_embedding)
     return df
 
 
