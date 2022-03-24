@@ -10,6 +10,13 @@ from tqdm import tqdm
 from src import BASEDATE, DATADIR
 
 
+def load_stations_metadata() -> pd.DataFrame:
+    """Load the stations metadata."""
+    stations_api = "https://rata.digitraffic.fi/api/v1/metadata/stations"
+    df = pd.read_json(requests.get(stations_api).text)
+    return df
+
+
 def load_trains_last_30_days() -> pd.DataFrame:
     """Load the trains dataset for the last 30 days."""
     last_30_days = [
