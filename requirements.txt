@@ -1,3 +1,9 @@
-gql[all]
+# Local packages
+-e .
+
+# External requirements
 pandas
 requests
+tqdm
+networkx==2.7.1
+dateutil
